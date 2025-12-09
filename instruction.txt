@@ -1,0 +1,4 @@
+CLIENT PORT ON HOST = 3000
+SERVER PORT ON HOST = 5000
+NGINX CLIENT FILE NAME = cctv-api.neuronomous.net.conf
+NGINX SERVER FILE NAME = sust-cctv.neuronomous.net.conf

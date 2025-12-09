@@ -1,0 +1,1901 @@
+openapi: 3.1.0
+info:
+  title: SUST CCTV Management System API
+  version: 1.0.0
+  description: |
+    A comprehensive API for managing CCTV cameras, zones, and user authentication in the SUST (Shahjalal University of Science and Technology) campus security system.
+
+    ## Features
+    - User authentication with JWT and refresh tokens
+    - Role-based access control (Admin/User)
+    - Camera management and monitoring
+    - Zone management and organization
+    - Real-time camera status tracking
+    - Comprehensive user management
+
+    ## Authentication
+    This API uses JWT (JSON Web Tokens) for authentication. Include the token in the Authorization header:
+    `Authorization: Bearer <your-jwt-token>`
+
+    ## Base URL
+    All API endpoints are prefixed with `/api/v1`
+  contact:
+    name: SUST CCTV System
+    email: support@sust-cctv.edu.bd
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:5080
+    description: Development server
+  - url: https://cctv-api.neuronomous.net
+    description: Production server
+
+tags:
+  - name: Authentication
+    description: User authentication and authorization endpoints
+  - name: Users
+    description: User management operations (Admin only)
+  - name: Zones
+    description: Zone management and camera organization
+  - name: Cameras
+    description: Camera management and monitoring
+  - name: System
+    description: System health and information endpoints
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Enter JWT token obtained from login endpoint
+
+  schemas:
+    User:
+      type: object
+      properties:
+        _id:
+          type: string
+          description: Unique identifier for the user
+          example: "507f1f77bcf86cd799439011"
+        name:
+          type: string
+          description: Full name of the user
+          example: "John Doe"
+          minLength: 2
+          maxLength: 50
+        email:
+          type: string
+          format: email
+          description: Email address of the user
+          example: "john.doe@sust.edu"
+        role:
+          type: string
+          /api/v1/cameras:
+            get:
+              tags:
+                - Cameras
+              summary: Get all cameras
+              description: Retrieve all cameras with pagination, search, and filtering
+              security:
+                - bearerAuth: []
+              parameters:
+                - name: page
+                  in: query
+                  description: Page number (1-based)
+                  schema:
+                    type: integer
+                    minimum: 1
+                    default: 1
+                - name: limit
+                  in: query
+                  description: Number of items per page
+                  schema:
+                    type: integer
+                    minimum: 1
+                    maximum: 100
+                    default: 10
+                - name: search
+                  in: query
+                  description: Search term for filtering cameras by name or location
+                  schema:
+                    type: string
+                - name: zone
+                  in: query
+                  description: Filter by zone ID
+                  schema:
+                    type: string
+                - name: status
+                  in: query
+                  description: Filter by camera status
+                  schema:
+                    type: string
+                    enum: [active, inactive]
+                - name: includeZone
+                  in: query
+                  description: Whether to include/populate zone details
+                  schema:
+                    type: boolean
+                    default: false
+              responses:
+                "200":
+                  description: Cameras retrieved successfully
+                  content:
+                    application/json:
+                      schema:
+                        type: object
+                        properties:
+                          statusCode:
+                            type: integer
+                            example: 200
+                          message:
+                            type: string
+                            example: "Cameras retrieved successfully"
+                          payload:
+                            type: object
+                            properties:
+                              cameras:
+                                type: array
+                                items:
+                                  $ref: "#/components/schemas/Camera"
+                              pagination:
+                                $ref: "#/components/schemas/PaginationResponse"
+                "401":
+                  description: Unauthorized
+                  content:
+                    application/json:
+                      schema:
+                        $ref: "#/components/schemas/ErrorResponse"
+
+            post:
+              tags:
+                - Cameras
+              summary: Create new camera
+              description: Create a new camera (Admin only)
+              security:
+                - bearerAuth: []
+              requestBody:
+                required: true
+                content:
+                  application/json:
+                    schema:
+                      $ref: "#/components/schemas/CameraCreateRequest"
+              responses:
+                "201":
+                  description: Camera created successfully
+                  content:
+                    application/json:
+                      schema:
+                        type: object
+                        properties:
+                          statusCode:
+                            type: integer
+                            example: 201
+                          message:
+                            type: string
+                            example: "Camera created successfully"
+                          payload:
+                            $ref: "#/components/schemas/Camera"
+                "400":
+                  description: Invalid input data
+                  content:
+                    application/json:
+                      schema:
+                        $ref: "#/components/schemas/ErrorResponse"
+                "401":
+                  description: Unauthorized
+                  content:
+                    application/json:
+                      schema:
+                        $ref: "#/components/schemas/ErrorResponse"
+                "403":
+                  description: Forbidden - Admin access required
+                  content:
+                    application/json:
+                      schema:
+                        $ref: "#/components/schemas/ErrorResponse"
+                "409":
+                  description: Camera already exists (duplicate MAC ID or IP)
+                  content:
+                    application/json:
+                      schema:
+                        $ref: "#/components/schemas/ErrorResponse"
+
+          /api/v1/cameras/bulk:
+            post:
+              tags:
+                - Cameras
+              summary: Bulk create cameras
+              description: Create multiple cameras in a single request (Admin only)
+              security:
+                - bearerAuth: []
+              requestBody:
+                required: true
+                content:
+                  application/json:
+                    schema:
+                      $ref: "#/components/schemas/CameraBulkCreateRequest"
+              responses:
+                "201":
+                  description: Cameras created successfully
+                  content:
+                    application/json:
+                      schema:
+                        type: object
+                        properties:
+                          statusCode:
+                            type: integer
+                            example: 201
+                          message:
+                            type: string
+                            example: "Cameras created successfully"
+                          payload:
+                            type: object
+                            properties:
+                              data:
+                                type: object
+                "207":
+                  description: Partial success - some cameras created with issues
+                  content:
+                    application/json:
+                      schema:
+                        $ref: "#/components/schemas/ApiResponse"
+                "400":
+                  description: Invalid input data
+                  content:
+                    application/json:
+                      schema:
+                        $ref: "#/components/schemas/ErrorResponse"
+
+          /api/v1/cameras/stats:
+            get:
+              tags:
+                - Cameras
+              summary: Get camera statistics
+              description: Get aggregated statistics about cameras (counts by status, zones, etc.)
+              security:
+                - bearerAuth: []
+              responses:
+                "200":
+                  description: Statistics retrieved successfully
+                  content:
+                    application/json:
+                      schema:
+                        type: object
+                        properties:
+                          statusCode:
+                            type: integer
+                            example: 200
+                          message:
+                            type: string
+                            example: "Camera statistics fetched successfully"
+                          payload:
+                            type: object
+                            properties:
+                              data:
+                                type: object
+                "401":
+                  description: Unauthorized
+                  content:
+                    application/json:
+                      schema:
+                        $ref: "#/components/schemas/ErrorResponse"
+
+          /api/v1/cameras/{id}:
+            get:
+              tags:
+                - Cameras
+              summary: Get camera by ID
+              description: Retrieve a specific camera by ID
+              security:
+                - bearerAuth: []
+              parameters:
+                - name: id
+                  in: path
+                  required: true
+                  description: Camera ID
+                  schema:
+                    type: string
+                    example: "507f1f77bcf86cd799439013"
+                - name: includeZone
+                  in: query
+                  description: Whether to include/populate zone details
+                  schema:
+                    type: boolean
+                    default: false
+              responses:
+                "200":
+                  description: Camera retrieved successfully
+                  content:
+                    application/json:
+                      schema:
+                        type: object
+                        properties:
+                          statusCode:
+                            type: integer
+                            example: 200
+                          message:
+                            type: string
+                            example: "Camera retrieved successfully"
+                          payload:
+                            $ref: "#/components/schemas/Camera"
+                "400":
+                  description: Invalid camera ID
+                  content:
+                    application/json:
+                      schema:
+                        $ref: "#/components/schemas/ErrorResponse"
+                "401":
+                  description: Unauthorized
+                  content:
+                    application/json:
+                      schema:
+                        $ref: "#/components/schemas/ErrorResponse"
+                "404":
+                  description: Camera not found
+                  content:
+                    application/json:
+                      schema:
+                        $ref: "#/components/schemas/ErrorResponse"
+
+            put:
+              tags:
+                - Cameras
+              summary: Update camera
+              description: Update a specific camera (Admin only)
+              security:
+                - bearerAuth: []
+              parameters:
+                - name: id
+                  in: path
+                  required: true
+                  description: Camera ID
+                  schema:
+                    type: string
+                    example: "507f1f77bcf86cd799439013"
+              requestBody:
+                required: true
+                content:
+                  application/json:
+                    schema:
+                      $ref: "#/components/schemas/CameraCreateRequest"
+              responses:
+                "200":
+                  description: Camera updated successfully
+                  content:
+                    application/json:
+                      schema:
+                        type: object
+                        properties:
+                          statusCode:
+                            type: integer
+                            example: 200
+                          message:
+                            type: string
+                            example: "Camera updated successfully"
+                          payload:
+                            $ref: "#/components/schemas/Camera"
+                "400":
+                  description: Invalid input data
+                  content:
+                    application/json:
+                      schema:
+                        $ref: "#/components/schemas/ErrorResponse"
+                "401":
+                  description: Unauthorized
+                  content:
+                    application/json:
+                      schema:
+                        $ref: "#/components/schemas/ErrorResponse"
+                "403":
+                  description: Forbidden - Admin access required
+                  content:
+                    application/json:
+                      schema:
+                        $ref: "#/components/schemas/ErrorResponse"
+                "404":
+                  description: Camera not found
+                  content:
+                    application/json:
+                      schema:
+                        $ref: "#/components/schemas/ErrorResponse"
+
+            delete:
+              tags:
+                - Cameras
+              summary: Delete camera
+              description: Delete a specific camera (Admin only)
+              security:
+                - bearerAuth: []
+              parameters:
+                - name: id
+                  in: path
+                  required: true
+                  description: Camera ID
+                  schema:
+                    type: string
+                    example: "507f1f77bcf86cd799439013"
+              responses:
+                "200":
+                  description: Camera deleted successfully
+                  content:
+                    application/json:
+                      schema:
+                        type: object
+                        properties:
+                          statusCode:
+                            type: integer
+                            example: 200
+                          message:
+                            type: string
+                            example: "Camera deleted successfully"
+                "400":
+                  description: Invalid camera ID
+                  content:
+                    application/json:
+                      schema:
+                        $ref: "#/components/schemas/ErrorResponse"
+                "401":
+                  description: Unauthorized
+                  content:
+                    application/json:
+                      schema:
+                        $ref: "#/components/schemas/ErrorResponse"
+                "403":
+                  description: Forbidden - Admin access required
+                  content:
+                    application/json:
+                      schema:
+                        $ref: "#/components/schemas/ErrorResponse"
+                "404":
+                  description: Camera not found
+                  content:
+                    application/json:
+                      schema:
+                        $ref: "#/components/schemas/ErrorResponse"
+
+          /api/v1/cameras/{id}/status:
+            patch:
+              tags:
+                - Cameras
+              summary: Update camera status
+              description: Update status of a specific camera (Admin only)
+              security:
+                - bearerAuth: []
+              parameters:
+                - name: id
+                  in: path
+                  required: true
+                  description: Camera ID
+                  schema:
+                    type: string
+                    example: "507f1f77bcf86cd799439013"
+              requestBody:
+                required: true
+                content:
+                  application/json:
+                    schema:
+                      type: object
+                      properties:
+                        status:
+                          type: string
+                          enum: [active, inactive]
+              responses:
+                "200":
+                  description: Camera status updated successfully
+                  content:
+                    application/json:
+                      schema:
+                        $ref: "#/components/schemas/ApiResponse"
+                "400":
+                  description: Invalid input data
+                  content:
+                    application/json:
+                      schema:
+                        $ref: "#/components/schemas/ErrorResponse"
+                "401":
+                  description: Unauthorized
+                  content:
+                    application/json:
+                      schema:
+                        $ref: "#/components/schemas/ErrorResponse"
+                "404":
+                  description: Camera not found
+                  content:
+                    application/json:
+                      schema:
+                        $ref: "#/components/schemas/ErrorResponse"
+
+          # Public camera endpoints (no auth required but require header checks)
+          /api/v1/public/cameras-ips:
+            get:
+              tags:
+                - Cameras
+              summary: Get all camera IPs (public)
+              description: Retrieve list of camera IPs for public/edge consumption. Requires header validation.
+              responses:
+                "200":
+                  description: Camera IPs retrieved successfully
+                  content:
+                    application/json:
+                      schema:
+                        type: object
+                        properties:
+                          statusCode:
+                            type: integer
+                            example: 200
+                          message:
+                            type: string
+                            example: "Camera IPs fetched successfully"
+                          payload:
+                            type: object
+                            properties:
+                              data:
+                                type: array
+                                items:
+                                  type: string
+
+          /api/v1/public/cameras:
+            patch:
+              tags:
+                - Cameras
+              summary: Bulk update camera status (public)
+              description: Bulk update camera status by IP (public route, header validation required)
+              requestBody:
+                required: true
+                content:
+                  application/json:
+                    schema:
+                      $ref: "#/components/schemas/BulkUpdateByIPRequest"
+              responses:
+                "200":
+                  description: Camera status updated successfully
+                  content:
+                    application/json:
+                      schema:
+                        $ref: "#/components/schemas/ApiResponse"
+                "207":
+                  description: Partial success (some updates failed or not found)
+                  content:
+                    application/json:
+                      schema:
+                        $ref: "#/components/schemas/ApiResponse"
+                "400":
+                  description: Invalid request
+                  content:
+                    application/json:
+                      schema:
+                        $ref: "#/components/schemas/ErrorResponse"
+        pole:
+          type: integer
+          description: Pole number where the camera is mounted
+          example: 1
+          minimum: 1
+        location:
+          type: string
+          description: Specific location description
+          example: "Main entrance of library"
+          maxLength: 200
+        mac_id:
+          type: string
+          description: MAC address of the camera
+          example: "00:1B:44:11:3A:B8"
+          pattern: "^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$"
+        ip:
+          type: string
+          description: IP address of the camera
+          example: "192.168.1.101"
+          pattern: "^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$"
+        status:
+          type: string
+          enum: [active, inactive]
+          description: Current status of the camera
+          example: "active"
+      required: [name, latitude, longitude, zone, pole, mac_id]
+
+    CameraBulkCreateRequest:
+      type: array
+      items:
+        type: object
+        properties:
+          name:
+            type: string
+          latitude:
+            type: number
+            format: double
+          longitude:
+            type: number
+            format: double
+          zone:
+            type: string
+          pole:
+            type: integer
+          location:
+            type: string
+          mac_id:
+            type: string
+          ip:
+            type: string
+          status:
+            type: string
+            enum: [active, inactive]
+          notes:
+            type: string
+      minItems: 1
+      maxItems: 100
+
+    BulkUpdateByIPRequest:
+      type: array
+      items:
+        type: object
+        properties:
+          ip:
+            type: string
+            description: IP address of the camera
+          status:
+            type: boolean
+            description: true for active, false for inactive
+        required: [ip, status]
+      minItems: 1
+      maxItems: 100
+
+    PaginationQuery:
+      type: object
+      properties:
+        page:
+          type: integer
+          description: Page number (1-based)
+          example: 1
+          minimum: 1
+        limit:
+          type: integer
+          description: Number of items per page
+          example: 10
+          minimum: 1
+          maximum: 100
+        search:
+          type: string
+          description: Search term for filtering results
+          example: "camera"
+
+    PaginationResponse:
+      type: object
+      properties:
+        currentPage:
+          type: integer
+          description: Current page number
+          example: 1
+        totalPages:
+          type: integer
+          description: Total number of pages
+          example: 5
+        items:
+          type: integer
+          description: Total number of items
+          example: 50
+        limit:
+          type: integer
+          description: Number of items per page
+          example: 10
+      required: [currentPage, totalPages, items, limit]
+
+paths:
+  # Authentication Endpoints
+  /api/v1/auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: User login
+      description: Authenticate user and return JWT tokens
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+            examples:
+              admin:
+                summary: Admin login
+                value:
+                  email: "admin@sust.edu"
+                  password: "admin123"
+              user:
+                summary: User login
+                value:
+                  email: "user@sust.edu"
+                  password: "user123"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "400":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/auth/refresh:
+    post:
+      tags:
+        - Authentication
+      summary: Refresh access token
+      description: Get a new access token using refresh token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshTokenRequest"
+      responses:
+        "200":
+          description: Token refreshed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  statusCode:
+                    type: integer
+                    example: 200
+                  message:
+                    type: string
+                    example: "Token refreshed successfully"
+                  payload:
+                    type: object
+                    properties:
+                      accessToken:
+                        type: string
+                        example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                      expiresIn:
+                        type: integer
+                        example: 3600
+        "400":
+          description: Invalid refresh token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/auth/me:
+    get:
+      tags:
+        - Authentication
+      summary: Get current user profile
+      description: Get the profile of the currently authenticated user
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: User profile retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  statusCode:
+                    type: integer
+                    example: 200
+                  message:
+                    type: string
+                    example: "User profile retrieved successfully"
+                  payload:
+                    $ref: "#/components/schemas/User"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    put:
+      tags:
+        - Authentication
+      summary: Update current user profile
+      description: Update the profile of the currently authenticated user
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  description: Full name of the user
+                  example: "John Doe Updated"
+                  minLength: 2
+                  maxLength: 50
+                email:
+                  type: string
+                  format: email
+                  description: Email address of the user
+                  example: "john.updated@sust.edu"
+      responses:
+        "200":
+          description: Profile updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  statusCode:
+                    type: integer
+                    example: 200
+                  message:
+                    type: string
+                    example: "Profile updated successfully"
+                  payload:
+                    $ref: "#/components/schemas/User"
+        "400":
+          description: Invalid input data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # User Management Endpoints
+  /api/v1/users:
+    get:
+      tags:
+        - Users
+      summary: Get all users
+      description: Retrieve all users with pagination and search (Admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          description: Page number (1-based)
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          description: Number of items per page
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 10
+        - name: search
+          in: query
+          description: Search term for filtering users by name or email
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Users retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  statusCode:
+                    type: integer
+                    example: 200
+                  message:
+                    type: string
+                    example: "Users retrieved successfully"
+                  payload:
+                    type: object
+                    properties:
+                      users:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/User"
+                      pagination:
+                        $ref: "#/components/schemas/PaginationResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden - Admin access required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    post:
+      tags:
+        - Users
+      summary: Create new user
+      description: Create a new user (Admin only)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserCreateRequest"
+      responses:
+        "201":
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  statusCode:
+                    type: integer
+                    example: 201
+                  message:
+                    type: string
+                    example: "User created successfully"
+                  payload:
+                    $ref: "#/components/schemas/User"
+        "400":
+          description: Invalid input data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden - Admin access required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: User already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/users/{id}:
+    get:
+      tags:
+        - Users
+      summary: Get user by ID
+      description: Retrieve a specific user by ID (Admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: User ID
+          schema:
+            type: string
+            example: "507f1f77bcf86cd799439011"
+      responses:
+        "200":
+          description: User retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  statusCode:
+                    type: integer
+                    example: 200
+                  message:
+                    type: string
+                    example: "User retrieved successfully"
+                  payload:
+                    $ref: "#/components/schemas/User"
+        "400":
+          description: Invalid user ID
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden - Admin access required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    put:
+      tags:
+        - Users
+      summary: Update user
+      description: Update a specific user (Admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: User ID
+          schema:
+            type: string
+            example: "507f1f77bcf86cd799439011"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserUpdateRequest"
+      responses:
+        "200":
+          description: User updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  statusCode:
+                    type: integer
+                    example: 200
+                  message:
+                    type: string
+                    example: "User updated successfully"
+                  payload:
+                    $ref: "#/components/schemas/User"
+        "400":
+          description: Invalid input data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden - Admin access required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    delete:
+      tags:
+        - Users
+      summary: Delete user
+      description: Delete a specific user (Admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: User ID
+          schema:
+            type: string
+            example: "507f1f77bcf86cd799439011"
+      responses:
+        "200":
+          description: User deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  statusCode:
+                    type: integer
+                    example: 200
+                  message:
+                    type: string
+                    example: "User deleted successfully"
+        "400":
+          description: Invalid user ID
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden - Admin access required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # Zone Management Endpoints
+  /api/v1/zones:
+    get:
+      tags:
+        - Zones
+      summary: Get all zones
+      description: Retrieve all zones with optional population of cameras
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: populate
+          in: query
+          description: Whether to populate camera details
+          schema:
+            type: boolean
+            default: false
+      responses:
+        "200":
+          description: Zones retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  statusCode:
+                    type: integer
+                    example: 200
+                  message:
+                    type: string
+                    example: "Zones retrieved successfully"
+                  payload:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Zone"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    post:
+      tags:
+        - Zones
+      summary: Create new zone
+      description: Create a new zone (Admin only)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ZoneCreateRequest"
+      responses:
+        "201":
+          description: Zone created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  statusCode:
+                    type: integer
+                    example: 201
+                  message:
+                    type: string
+                    example: "Zone created successfully"
+                  payload:
+                    $ref: "#/components/schemas/Zone"
+        "400":
+          description: Invalid input data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden - Admin access required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Zone already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/zones/{id}:
+    get:
+      tags:
+        - Zones
+      summary: Get zone by ID
+      description: Retrieve a specific zone by ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Zone ID
+          schema:
+            type: string
+            example: "507f1f77bcf86cd799439012"
+        - name: populate
+          in: query
+          description: Whether to populate camera details
+          schema:
+            type: boolean
+            default: false
+      responses:
+        "200":
+          description: Zone retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  statusCode:
+                    type: integer
+                    example: 200
+                  message:
+                    type: string
+                    example: "Zone retrieved successfully"
+                  payload:
+                    $ref: "#/components/schemas/Zone"
+        "400":
+          description: Invalid zone ID
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Zone not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    put:
+      tags:
+        - Zones
+      summary: Update zone
+      description: Update a specific zone (Admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Zone ID
+          schema:
+            type: string
+            example: "507f1f77bcf86cd799439012"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ZoneCreateRequest"
+      responses:
+        "200":
+          description: Zone updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  statusCode:
+                    type: integer
+                    example: 200
+                  message:
+                    type: string
+                    example: "Zone updated successfully"
+                  payload:
+                    $ref: "#/components/schemas/Zone"
+        "400":
+          description: Invalid input data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden - Admin access required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Zone not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    delete:
+      tags:
+        - Zones
+      summary: Delete zone
+      description: Delete a specific zone (Admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Zone ID
+          schema:
+            type: string
+            example: "507f1f77bcf86cd799439012"
+      responses:
+        "200":
+          description: Zone deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  statusCode:
+                    type: integer
+                    example: 200
+                  message:
+                    type: string
+                    example: "Zone deleted successfully"
+        "400":
+          description: Invalid zone ID or zone has cameras
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden - Admin access required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Zone not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # Camera Management Endpoints
+  /api/v1/cameras:
+    get:
+      tags:
+        - Cameras
+      summary: Get all cameras
+      description: Retrieve all cameras with pagination, search, and filtering
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          description: Page number (1-based)
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          description: Number of items per page
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 10
+        - name: search
+          in: query
+          description: Search term for filtering cameras by name or location
+          schema:
+            type: string
+        - name: zone
+          in: query
+          description: Filter by zone ID
+          schema:
+            type: string
+        - name: status
+          in: query
+          description: Filter by camera status
+          schema:
+            type: string
+            enum: [active, inactive]
+        - name: includeZone
+          in: query
+          description: Whether to include/populate zone details
+          schema:
+            type: boolean
+            default: false
+      responses:
+        "200":
+          description: Cameras retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  statusCode:
+                    type: integer
+                    example: 200
+                  message:
+                    type: string
+                    example: "Cameras retrieved successfully"
+                  payload:
+                    type: object
+                    properties:
+                      cameras:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/Camera"
+                      pagination:
+                        $ref: "#/components/schemas/PaginationResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    post:
+      tags:
+        - Cameras
+      summary: Create new camera
+      description: Create a new camera (Admin only)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CameraCreateRequest"
+      responses:
+        "201":
+          description: Camera created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  statusCode:
+                    type: integer
+                    example: 201
+                  message:
+                    type: string
+                    example: "Camera created successfully"
+                  payload:
+                    $ref: "#/components/schemas/Camera"
+        "400":
+          description: Invalid input data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden - Admin access required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Camera already exists (duplicate MAC ID or IP)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/cameras/{id}:
+    get:
+      tags:
+        - Cameras
+      summary: Get camera by ID
+      description: Retrieve a specific camera by ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Camera ID
+          schema:
+            type: string
+            example: "507f1f77bcf86cd799439013"
+        - name: populate
+          in: query
+          description: Whether to populate zone details
+          schema:
+            type: boolean
+            default: false
+      responses:
+        "200":
+          description: Camera retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  statusCode:
+                    type: integer
+                    example: 200
+                  message:
+                    type: string
+                    example: "Camera retrieved successfully"
+                  payload:
+                    $ref: "#/components/schemas/Camera"
+        "400":
+          description: Invalid camera ID
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Camera not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    put:
+      tags:
+        - Cameras
+      summary: Update camera
+      description: Update a specific camera (Admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Camera ID
+          schema:
+            type: string
+            example: "507f1f77bcf86cd799439013"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CameraCreateRequest"
+      responses:
+        "200":
+          description: Camera updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+
+            /api/v1/cameras/stats:
+              get:
+                tags:
+                  - Cameras
+                summary: Get camera statistics
+                description: Get aggregated statistics about cameras (counts by status, zones, etc.)
+                security:
+                  - bearerAuth: []
+                responses:
+                  "200":
+                    description: Statistics retrieved successfully
+                    content:
+                      application/json:
+                        schema:
+                          type: object
+                          properties:
+                            statusCode:
+                              type: integer
+                              example: 200
+                            message:
+                              type: string
+                              example: "Camera statistics fetched successfully"
+                            payload:
+                              type: object
+                              properties:
+                                data:
+                                  type: object
+                  "401":
+                    description: Unauthorized
+                    content:
+                      application/json:
+                        schema:
+                          $ref: "#/components/schemas/ErrorResponse"
+
+            /api/v1/cameras/{id}/status:
+              patch:
+                tags:
+                  - Cameras
+                summary: Update camera status
+                description: Update status of a specific camera (Admin only)
+                security:
+                  - bearerAuth: []
+                parameters:
+                  - name: id
+                    in: path
+                    required: true
+                    description: Camera ID
+                    schema:
+                      type: string
+                      example: "507f1f77bcf86cd799439013"
+                requestBody:
+                  required: true
+                  content:
+                    application/json:
+                      schema:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                            enum: [active, inactive]
+                responses:
+                  "200":
+                    description: Camera status updated successfully
+                    content:
+                      application/json:
+                        schema:
+                          $ref: "#/components/schemas/ApiResponse"
+                  "400":
+                    description: Invalid input data
+                    content:
+                      application/json:
+                        schema:
+                          $ref: "#/components/schemas/ErrorResponse"
+                  "401":
+                    description: Unauthorized
+                    content:
+                      application/json:
+                        schema:
+                          $ref: "#/components/schemas/ErrorResponse"
+                  "404":
+                    description: Camera not found
+                    content:
+                      application/json:
+                        schema:
+                          $ref: "#/components/schemas/ErrorResponse"
+
+            # Public camera endpoints (no auth required but require header checks)
+            /api/v1/public/cameras-ips:
+              get:
+                tags:
+                  - Cameras
+                summary: Get all camera IPs (public)
+                description: Retrieve list of camera IPs for public/edge consumption. Requires header validation.
+                responses:
+                  "200":
+                    description: Camera IPs retrieved successfully
+                    content:
+                      application/json:
+                        schema:
+                          type: object
+                          properties:
+                            statusCode:
+                              type: integer
+                              example: 200
+                            message:
+                              type: string
+                              example: "Camera IPs fetched successfully"
+                            payload:
+                              type: object
+                              properties:
+                                data:
+                                  type: array
+                                  items:
+                                    type: string
+
+            /api/v1/public/cameras:
+              patch:
+                tags:
+                  - Cameras
+                summary: Bulk update camera status (public)
+                description: Bulk update camera status by IP (public route, header validation required)
+                requestBody:
+                  required: true
+                  content:
+                    application/json:
+                      schema:
+                        $ref: "#/components/schemas/BulkUpdateByIPRequest"
+                responses:
+                  "200":
+                    description: Camera status updated successfully
+                    content:
+                      application/json:
+                        schema:
+                          $ref: "#/components/schemas/ApiResponse"
+                  "207":
+                    description: Partial success (some updates failed or not found)
+                    content:
+                      application/json:
+                        schema:
+                          $ref: "#/components/schemas/ApiResponse"
+                  "400":
+                    description: Invalid request
+                    content:
+                      application/json:
+                        schema:
+                          $ref: "#/components/schemas/ErrorResponse"
+                  statusCode:
+                    type: integer
+                    example: 200
+                  message:
+                    type: string
+                    example: "Camera updated successfully"
+                  payload:
+                    $ref: "#/components/schemas/Camera"
+        "400":
+          description: Invalid input data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden - Admin access required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Camera not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    delete:
+      tags:
+        - Cameras
+      summary: Delete camera
+      description: Delete a specific camera (Admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Camera ID
+          schema:
+            type: string
+            example: "507f1f77bcf86cd799439013"
+      responses:
+        "200":
+          description: Camera deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  statusCode:
+                    type: integer
+                    example: 200
+                  message:
+                    type: string
+                    example: "Camera deleted successfully"
+        "400":
+          description: Invalid camera ID
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden - Admin access required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Camera not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # System Endpoints
+  /api/v1/health:
+    get:
+      tags:
+        - System
+      summary: Health check
+      description: Check if the API is running and healthy
+      responses:
+        "200":
+          description: API is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  statusCode:
+                    type: integer
+                    example: 200
+                  message:
+                    type: string
+                    example: "API is healthy"
+                  payload:
+                    type: object
+                    properties:
+                      status:
+                        type: string
+                        example: "ok"
+                      timestamp:
+                        type: string
+                        format: date-time
+                      uptime:
+                        type: number
+                        description: Server uptime in seconds
+                        example: 3600
